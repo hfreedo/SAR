@@ -1,7 +1,6 @@
-#define JASY_LIGHTS 1
 // Adaptacion directa de Robot_movil_SAR; ver README de esta carpeta.
 /*
-  SAR - control proporcional RoboLink, sensores, luces y servos
+  SAR - control proporcional RoboLink y sensores
   -------------------------------------------------------------------
   Este sketch es independiente del firmware principal.
 
@@ -48,10 +47,6 @@
 */
 
 #include <SoftwareSerial.h>
-#include <ServoTimer2Plus.h>
-#if JASY_LIGHTS
-#include <Adafruit_NeoPixel.h>
-#endif
 
 // ------------------------- PINOUT -------------------------
 const byte BT_RX = 13;      // TXD del HC-06 -> D13
@@ -66,7 +61,7 @@ const byte ENB = 10;
 
 const byte TRIG_PIN = 2;
 const byte ECHO_PIN = 3;
-const byte IR_IZQ = 8, IR_DER = 11, SERVO1_PIN = A1, SERVO2_PIN = A2;
+const byte IR_IZQ = 8, IR_DER = 11;
 
 SoftwareSerial bluetooth(BT_RX, BT_TX);
 const unsigned long BAUD_BT = 38400;
@@ -125,17 +120,8 @@ byte longitudBT = 0;
 
 
 bool proteccion = true, irIzq = false, irDer = false, bloqueoSensor = false;
-bool luces = false, luzEnviada = false, siguienteAnterior = false;
-bool servo1Activo = false, servo2Activo = false;
-int posicion1 = 90, posicion2 = 90, destino1 = 90, destino2 = 90;
-byte animacion = 1, velocidadLED[4] = {4,4,4,4};
-unsigned long ultimoServo = 0, ultimoLED = 0, ultimaRecepcion = 0, faseLED = 0;
-unsigned long bytesRX = 0, lineasRX = 0, controlesRX = 0, erroresRX = 0, framesLED = 0;
+unsigned long bytesRX = 0, lineasRX = 0, controlesRX = 0, erroresRX = 0;
 char ultimaTrama[128] = {};
-ServoTimer2Plus servo1, servo2;
-#if JASY_LIGHTS
-Adafruit_NeoPixel tira(9, A0, NEO_GRB + NEO_KHZ800);
-#endif
 
 void setup();
 void loop();
@@ -166,9 +152,6 @@ void enviarAyuda(bool desdeBT);
 void enviarEstadoUSB(unsigned long ahora);
 bool campoSAR(const char* clave, int valor);
 void protegerSensores();
-void actualizarServos(unsigned long ahora);
-bool mostrarLuces();
-void actualizarLuces(unsigned long ahora);
 
 // ------------------------- SETUP --------------------------
 void setup() {
@@ -185,9 +168,6 @@ void setup() {
   pinMode(ECHO_PIN, INPUT);
 
   pinMode(IR_IZQ, INPUT_PULLUP); pinMode(IR_DER, INPUT_PULLUP);
-#if JASY_LIGHTS
-  tira.begin(); tira.setBrightness(35); tira.clear(); tira.show();
-#endif
   detenerInmediato();
   randomSeed(analogRead(A0));
 
@@ -212,7 +192,6 @@ void loop() {
       ejeAcelerador = 0;
       objetivoIzquierdo = 0;
       objetivoDerecho = 0;
-      destino1 = posicion1; destino2 = posicion2;
       Serial.println(F("EVT;STOP;TIMEOUT"));
     }
     if (controlRecibido) calcularObjetivos();
@@ -222,8 +201,6 @@ void loop() {
 
   protegerSensores();
   actualizarRampas(ahora);
-  actualizarServos(ahora);
-  actualizarLuces(ahora);
   enviarEstadoUSB(ahora);
 }
 
@@ -231,7 +208,7 @@ void loop() {
 void procesarPuerto(Stream& puerto, char* buffer, byte& longitud, bool desdeBT) {
   while (puerto.available() > 0) {
     char c = puerto.read();
-    if (desdeBT) { ++bytesRX; ultimaRecepcion = millis(); }
+    if (desdeBT) ++bytesRX;
 
     if (c == '\r') continue;
 
@@ -573,7 +550,6 @@ void aplicarMotorDerecho(int pwmFirmado) {
 }
 
 void detenerInmediato() {
-  destino1 = posicion1; destino2 = posicion2;
   ejeDireccion = 0;
   ejeAcelerador = 0;
   objetivoIzquierdo = 0;
@@ -694,7 +670,7 @@ void enviarAyuda(bool desdeBT) {
   responder(F("CMD;J,x,y | X,x | Y,y | F/V/I/D/S | M"), desdeBT);
   responder(F("CMD;CFG,SENS|TURN|DEAD|MAX|MIN|EXPO|TRIML|TRIMR,valor"), desdeBT);
   responder(F("CMD;STATUS | PING | RX | ?"), desdeBT);
-  responder(F("SAR;r=proteccion,l=luces,a=1..4,n=siguiente,v=1..10,u/w=30..150"), desdeBT);
+  responder(F("SAR;r=proteccion sensores 0/1"), desdeBT);
 }
 
 // Telemetria solo por USB para no bloquear la recepcion del HC-06.
@@ -725,25 +701,9 @@ void enviarEstadoUSB(unsigned long ahora) {
 
 
 bool campoSAR(const char* clave, int valor) {
-  if (igual(clave, "r")) { if (valor == 0 || valor == 1) proteccion = valor; return true; }
-  if (igual(clave, "l")) { if (valor == 0 || valor == 1) luces = valor; return true; }
-  if (igual(clave, "a")) { if (valor >= 1 && valor <= 4) animacion = valor; return true; }
-  if (igual(clave, "n")) {
-    if (valor == 1 && !siguienteAnterior) animacion = animacion % 4 + 1;
-    siguienteAnterior = valor != 0;
+  if (igual(clave, "r")) {
+    if (valor == 0 || valor == 1) proteccion = valor;
     return true;
-  }
-  if (igual(clave, "v")) {
-    if (valor >= 1 && valor <= 10) velocidadLED[animacion - 1] = valor;
-    return true;
-  }
-  if (igual(clave, "u") && valor >= 30 && valor <= 150) {
-    if (!servo1Activo) { servo1.attach(SERVO1_PIN, 1000, 2000); servo1.write(90); servo1Activo = true; }
-    destino1 = valor; return true;
-  }
-  if (igual(clave, "w") && valor >= 30 && valor <= 150) {
-    if (!servo2Activo) { servo2.attach(SERVO2_PIN, 1000, 2000); servo2.write(90); servo2Activo = true; }
-    destino2 = valor; return true;
   }
   return false;
 }
@@ -755,58 +715,4 @@ void protegerSensores() {
   bloqueoSensor = proteccion && (objetivoIzquierdo || objetivoDerecho) &&
     (irIzq || irDer || (adelante && (distanciaCm < 0 || distanciaCm <= 20)));
   if (bloqueoSensor) objetivoIzquierdo = objetivoDerecho = 0;
-}
-
-void actualizarServos(unsigned long ahora) {
-  if (ahora - ultimoServo < 20) return;
-  ultimoServo = ahora;
-  if (servo1Activo && posicion1 != destino1) {
-    posicion1 += posicion1 < destino1 ? 1 : -1; servo1.write(posicion1);
-  }
-  if (servo2Activo && posicion2 != destino2) {
-    posicion2 += posicion2 < destino2 ? 1 : -1; servo2.write(posicion2);
-  }
-}
-
-#if JASY_LIGHTS
-bool mostrarLuces() {
-  byte previo = SREG;
-  cli();
-  if ((servo1Activo && digitalRead(SERVO1_PIN)) || (servo2Activo && digitalRead(SERVO2_PIN))) {
-    SREG = previo; return false;
-  }
-  tira.show(); SREG = previo; ++framesLED; return true;
-}
-#endif
-
-void actualizarLuces(unsigned long ahora) {
-#if JASY_LIGHTS
-  if (!luces) {
-    if (luzEnviada) { tira.clear(); if (mostrarLuces()) luzEnviada = false; }
-    return;
-  }
-  unsigned long intervalo = 600 - (velocidadLED[animacion - 1] - 1) * 500UL / 9;
-  if (ahora - ultimoLED < intervalo || bluetooth.available() || longitudBT ||
-      ahora - ultimaRecepcion < 5) return;
-  ultimoLED = ahora;
-  tira.clear();
-  for (byte i = 0; i < 9; ++i) {
-    uint32_t color = 0;
-    if (animacion == 1) {
-      byte paso = faseLED % 16;
-      if (i == (paso <= 8 ? paso : 16 - paso)) color = tira.Color(180, 100, 0);
-    } else if (animacion == 2) {
-      color = tira.ColorHSV((uint16_t)(faseLED * 2048UL + i * 65536UL / 9));
-    } else if (animacion == 3) {
-      byte paso = faseLED % 32, nivel = 8 + (paso <= 16 ? paso : 32 - paso) * 12;
-      color = tira.Color(nivel, nivel / 2, 0);
-    } else {
-      byte niveles[] = {8,35,90,160,90,35,8,0};
-      byte nivel = niveles[faseLED % 8];
-      color = tira.Color(0, nivel, nivel);
-    }
-    tira.setPixelColor(i, color);
-  }
-  if (mostrarLuces()) { ++faseLED; luzEnviada = true; }
-#endif
 }

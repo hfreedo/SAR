@@ -12,4 +12,4 @@ while (cpu.cycles < 50000000 && ![0xa5, 0xee].includes(cpu.data[0x3e])) {
 if (cpu.data[0x3e] !== 0xa5) {
   throw new Error(`Prueba fallida o timeout: caso=${cpu.data[0x4a]}, ciclos=${cpu.cycles}`);
 }
-console.log(`PASS: compatibilidad SAR, sensores, servos y luces con perifericos simulados; ${cpu.cycles} ciclos.`);
+console.log(`PASS: SAR sin bibliotecas externas: protocolo, sensores, STOP, timeout y rampas; ${cpu.cycles} ciclos.`);

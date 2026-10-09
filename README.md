@@ -1,6 +1,8 @@
 # SAR
 
-Vehículo Arduino UNO controlado desde **RoboLink por Bluetooth Classic**: movimiento proporcional, protección opcional por sensores, nueve LEDs WS2812B y dos servos.
+Vehículo Arduino UNO controlado desde **RoboLink por Bluetooth Classic**: movimiento proporcional y protección opcional por sensores.
+
+**No requiere bibliotecas externas.** Ambos sketches usan únicamente `SoftwareSerial`, incluida en **Arduino AVR Boards** para Arduino UNO. No se necesitan NeoPixel ni bibliotecas de servos.
 
 **Primera puesta en marcha:** cablear → cargar el configurador Bluetooth → comprobar su resultado → cargar SAR → configurar RoboLink → probar con las ruedas levantadas.
 
@@ -9,7 +11,7 @@ Vehículo Arduino UNO controlado desde **RoboLink por Bluetooth Classic**: movim
 | Programa | Para qué sirve | Cuándo cargarlo |
 |---|---|---|
 | [Configurar_BT_SAR.ino](firmware/Configurar_BT_SAR/Configurar_BT_SAR.ino) | Ajusta el HC-06 a 38400 y solicita el nombre SAR | Primera instalación o módulo nuevo |
-| [SAR.ino](firmware/SAR/SAR.ino) | Controla motores, sensores, luces y servos | Después de configurar Bluetooth; es el programa de uso diario |
+| [SAR.ino](firmware/SAR/SAR.ino) | Controla motores y sensores | Después de configurar Bluetooth; es el programa de uso diario |
 
 **Son dos programas separados.** El configurador no conduce el vehículo. No abrir ambos `.ino` como pestañas del mismo sketch.
 
@@ -17,7 +19,7 @@ Para descargar: botón **Code → Download ZIP**, extraer el ZIP y abrir el `.in
 
 ## 2. Materiales y cableado
 
-Arduino UNO, L298N, dos motores DC adecuados a la alimentación, HC-06, HC-SR04, dos sensores IR digitales, nueve LEDs WS2812B RGB y hasta dos servos **posicionales**. Los LEDs y servos son opcionales.
+Arduino UNO, L298N, dos motores DC adecuados a la alimentación, HC-06, HC-SR04 y dos sensores IR digitales.
 
 Conectar con la alimentación apagada:
 
@@ -31,8 +33,6 @@ Conectar con la alimentación apagada:
 | **RXD del HC-06** | **D12 mediante divisor**, transmisión del Arduino |
 | HC-SR04 TRIG / ECHO | **D2 / D3** |
 | IR izquierdo OUT / derecho OUT | **D8 / D11** |
-| WS2812B DIN | **A0**, con resistencia serie 330–470 Ω |
-| Señal servo 1 / servo 2 | **A1 / A2** |
 | GND de todos los módulos y fuentes | **GND común** |
 
 **Retirar los jumpers ENA y ENB** para regular velocidad. No confundirlos con el jumper del regulador de 5 V del L298N.
@@ -52,8 +52,6 @@ Los 2 kΩ pueden ser dos resistencias de 1 kΩ en serie. TXD del HC-06 va direct
 Alimentación:
 
 - Motores: fuente adecuada a su tensión nominal, conectada a la entrada de potencia del L298N. Su caída de tensión también debe considerarse.
-- Servos: fuente externa regulada según su modelo, dimensionada para la corriente de ambos. No alimentarlos desde el pin 5 V del UNO.
-- Tira: 5 V externos; nueve RGB pueden aproximarse a 540 mA a blanco pleno, según modelo. Añadir capacitor de 500–1000 µF, al menos 6,3 V, respetando polaridad.
 - HC-SR04 y módulos IR compatibles con 5 V: VCC a 5 V. HC-06: 5 V en VCC **solo si la placa adaptadora lo admite**; el módulo desnudo requiere comprobar su especificación.
 - No unir salidas de fuentes/reguladores entre sí. El jumper de alimentación del L298N depende de su placa y tensión: comprobar su documentación.
 
@@ -61,12 +59,13 @@ Alimentación:
 
 1. Instalar Arduino IDE y el paquete **Arduino AVR Boards** desde el gestor de placas, si falta.
 2. Conectar el UNO por USB y seleccionar **Arduino Uno** y su puerto.
-3. Desde el gestor de bibliotecas instalar **Adafruit NeoPixel** y **ServoTimer2Plus**. Versiones comprobadas: 1.15.5 y 1.0.0.
-4. `SoftwareSerial` viene con Arduino AVR Boards. No sustituir `ServoTimer2Plus` por `Servo`: esta última interfiere con el PWM de D9/D10.
+3. Abrir el sketch correspondiente y cargarlo. **No hace falta instalar ninguna biblioteca adicional.** `SoftwareSerial` viene con el paquete de placas.
+
+El firmware está preparado para **Arduino UNO**, no para cualquier modelo de placa. En un PC nuevo puede ser necesario instalar el controlador USB de su placa, especialmente si es un clon.
 
 ## 4. Configurar automáticamente el HC-06
 
-**Antes:** desconectar RoboLink del módulo y dejar sin potencia motores y servos. El HC-06 debe estar alimentado pero sin enlace Bluetooth.
+**Antes:** desconectar RoboLink del módulo y dejar sin potencia los motores. El HC-06 debe estar alimentado pero sin enlace Bluetooth.
 
 1. Abrir [Configurar_BT_SAR.ino](firmware/Configurar_BT_SAR/Configurar_BT_SAR.ino).
 2. Cargarlo en el UNO.
@@ -100,7 +99,11 @@ El monitor USB a 115200 **no cambia el baud del HC-06**. La app se conecta por B
 
 ## 6. Configurar RoboLink
 
-Los nombres exactos de menús dependen de la versión de la app; abajo se indica el tipo de control y sus propiedades, no una ruta de menús inventada.
+**[Abrir la guía visual paso a paso para estudiantes](docs/ROBOLINK.md)**: usa las capturas de la app y explica EDIT, + Add, los tipos de control y los valores de cada campo.
+
+![Ventana Add Control: elegir JOYSTICK SLIDER BUTTON o TOGGLE](docs/images/robolink-agregar-control.png)
+
+Recorrido básico: **EDIT → + Add → elegir el tipo → completar Label, Key y valores → confirmar el formulario → DONE**. Para la conexión elegir **Bluetooth**, no Wi-Fi/UDP. Los nombres de campos inferiores pueden variar según la versión.
 
 Crear un preset con **un joystick XY**, datos `clave:valor` separados por comas y **salto de línea LF** al final. Empezar con envío repetido cada **30 ms**; si la app no permite fijarlo, verificar su frecuencia con el registro serie.
 
@@ -119,38 +122,22 @@ El firmware inicia con potencia 160; el slider `p:100` la baja para la primera p
 
 **No agregar el botón de modo al primer preset.** Omitir `m` o mantenerlo en 0. Un flanco `m:1` activa el modo autónomo heredado de SAR, que puede seguir moviéndose sin órdenes manuales. No es necesario para conducir con el joystick.
 
-### Luces y servos
-
-| Nombre sugerido | Tipo | Clave | Valores / comportamiento |
-|---|---|---|---|
-| Luces | **Toggle mantenido** | `l` | 1 encendidas, 0 apagadas; inicial 0 |
-| Siguiente animación | **Botón momentáneo** | `n` | 1 presionado, 0 liberado; un cambio por pulsación |
-| Velocidad LED | Slider entero | `v` | 1 lenta a 10 rápida; inicial 4 |
-| Servo 1 | Slider entero | `u` | 30–150; inicial 90; conserva valor al soltar |
-| Servo 2 | Slider entero | `w` | 30–150; inicial 90; conserva valor al soltar |
-
-`l` es **ele minúscula**, no el número uno. No agregar `u/w` hasta tener servos posicionales conectados y alimentados: la primera orden habilita sus pulsos, empezando en 90 nominales.
-
-Para probar luces: activar `l`, pulsar y soltar `n`, luego mover `v`. Los efectos son **barrido → arcoíris → respiración → destellos suaves**. Al apagar `l`, se envía negro una vez y se suspenden las actualizaciones. Si solo enciende al mantener presionado, cambiar el widget de momentáneo a toggle.
-
-Opcional: usar un selector `a` de 1–4 en lugar del botón `n`. **No enviar un `a` fijo junto con `n`**, porque puede restablecer el efecto en cada trama.
-
-Ejemplo de reposo con movimiento y luces:
+Ejemplo de reposo:
 
 ```text
-x:100,y:100,p:100,g:100,s:0,r:1,l:0,n:0,v:4
+x:100,y:100,p:100,g:100,s:0,r:1
 ```
 
-Agregar un **LF real** al final, no los dos caracteres literales `\n`. Con servos conectados se pueden agregar `,u:90,w:90`. Usar claves minúsculas y números enteros.
+Agregar un **LF real** al final, no los dos caracteres literales `\n`. Usar claves minúsculas y números enteros. Si reutilizás el preset anterior, retirar los controles de luces y servos (`l/a/n/v/u/w`); esta edición no los utiliza.
 
 ## 7. Primera prueba y comportamiento esperado
 
-1. Levantar las ruedas, dejar libres los sensores y mantener accesible la desconexión de potencia. Probar sin carga alta y sin brazos montados en los servos.
+1. Levantar las ruedas, dejar libres los sensores y mantener accesible la desconexión de potencia. Probar sin carga alta.
 2. Conectar RoboLink, dejar joystick centrado y comprobar que `cmd` aumenta en el monitor.
 3. Avanzar lentamente y comprobar ambos motores. Si uno gira invertido, apagar la alimentación antes de intercambiar sus dos cables.
 4. Probar izquierda/derecha. **Solo X, con Y centrado, gira sobre el eje**: es el comportamiento SAR.
 5. Mantener PARAR presionado: las salidas de motor deben quedar en cero. Al soltar, un joystick todavía inclinado puede volver a moverlo; STOP no está enclavado.
-6. Con `r:1`, acercar un objeto al frontal y a cada IR. Probar las luces y luego los servos, uno por uno.
+6. Con `r:1`, acercar un objeto al frontal y a cada IR. Comprobar que el vehículo se detenga con la protección activada.
 7. Desconectar Bluetooth en MANUAL: tras 250 ms sin órdenes de movimiento comienza la parada con rampa. Finalmente probar en el suelo a baja potencia.
 
 Con protección activa, cualquier IR LOW bloquea movimiento. El ultrasonido bloquea objetivos positivos, incluidos pivotes, con distancia **≤20 cm o sin eco**. Las lecturas de 3–5 cm no son un fallo de Bluetooth: provocan bloqueo. `r:0` desactiva ese frenado; usarlo sobre soporte para aislar un problema y volver a activar protección.
@@ -167,16 +154,12 @@ Al retirar un obstáculo, una orden mantenida puede reanudar la marcha. No hay d
 | No hay movimiento y `cmd` no aumenta | Conexión, baud 38400, LF y claves del preset. Enviar **RX** + salto de línea por USB para ver lo recibido |
 | `cmd` aumenta pero `block=1` | Revisar `dist`, IR y `r`; no cambiar baud por un bloqueo de sensor |
 | El LED L parpadea | Comparte D13 con recepción Bluetooth; por sí solo no indica avería |
-| Repite el mensaje de arranque | Posibles reinicios: revisar alimentación, especialmente al accionar motores/servos |
-| Luces solo mientras presiono | `l` debe ser toggle mantenido, no momentáneo |
-| Animación no cambia | Verificar que `n` pase 0→1→0 y que no se envíe `a` fijo |
-| Movimiento entrecortado con luces | Apagar `l` y comparar. NeoPixel suspende brevemente interrupciones; no se garantiza comunicación perfecta |
-| Servos vibran | Probar fuente externa y luces OFF. SoftwareSerial también puede perturbar pulsos; puede requerirse controlador de servos externo |
+| Repite el mensaje de arranque | Posibles reinicios: revisar alimentación al accionar los motores |
 
-`TEL` muestra ejes internos −100..100, PWM aplicado `left/right`, distancia, protección, IR, bloqueo y contadores. `cmd` cuenta órdenes de joystick, no todos los comandos de accesorios. Por USB, `?` muestra ayuda y `STATUS` muestra calibración; enviar siempre salto de línea.
+`TEL` muestra ejes internos −100..100, PWM aplicado `left/right`, distancia, protección, IR, bloqueo y contadores. `cmd` cuenta órdenes de movimiento. Por USB, `?` muestra ayuda y `STATUS` muestra calibración; enviar siempre salto de línea.
 
 ## 9. Verificación y alcance
 
 El control SAR previo fue probado por el usuario. Esta edición del repositorio se comprueba mediante compilación UNO y pruebas de lógica en AVR con periféricos simulados; **no equivalen a verificar el cableado final, el cambio AT real, la radio ni la estabilidad física**.
 
-[Cómo repetir compilación y pruebas](docs/VERIFICACION.md). Las dependencias mantienen las licencias de sus respectivos autores; no se incluyen sus fuentes.
+[Cómo repetir compilación y pruebas](docs/VERIFICACION.md). La biblioteca estándar mantiene la licencia de su autor; sus fuentes vienen con Arduino AVR Boards.
